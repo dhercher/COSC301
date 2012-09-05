@@ -14,7 +14,8 @@ int main(int argc, char **argv)
     /*    test of whitespace removal      */
     /* ********************************** */
     printf("remove whitespace: before <%s>", orig);
-    printf(" and after <%s>\n", removewhitespace(copy));
+    removewhitespace(copy);
+    printf(" and after <%s>\n", copy);
     free(copy);                    // free modified copy
  
     /* ********************************** */
