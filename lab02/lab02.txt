@@ -1,0 +1,18 @@
+Cosc 301
+Dylan Hercher
+Lab 02
+1.
+The code runs up to fork.  After the fork, the parent process continues until it is done, printing:
+	Who are you? 150 \n
+After the parent process is done, the child continues from the fork with pid = 0.This then prints:
+	Or am I? 50
+
+2.
+
+3.
+
+4.
+The variable buffer is not declared on the heap, and there is no way to return local memory since it will be deleted.
+We need to use malloc with buffer, so the declaration for buffer becomes:
+    char *buffer = malloc(sizeof(char) * (strlen(s) + 1));
+
