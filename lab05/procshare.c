@@ -11,7 +11,7 @@ void worker(long *counter)
 {
     printf("child process %d starting\n", getpid());
     int i = 0;
-    for (; i < 100000; i += 1) {
+    for (; i < 1000000; i += 1) {
         *counter += 1;
     }
     printf("child process %d ending with counter %ld\n", getpid(), *counter);
