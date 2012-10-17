@@ -3,15 +3,13 @@
 #include <string.h>
 #include <ctype.h>
 
-void
-removewhitespace(char *s1)
+void removewhitespace(char *s1)
 {
     // remove whitespace from a string, in place
     if (!s1)
         return;
-    
     char *s2 = strdup(s1);
-    free(s1);
+    // free(s1);
     char *buffer = malloc(sizeof(s2));
     int i = 0;
     int j = 0;
@@ -23,50 +21,52 @@ removewhitespace(char *s1)
     }
     buffer[j] = '\0';
     strcpy(s1, buffer);
+    free(s2);
 }
 
 
-char**
-tokenify(char *s)
+char** tokenify(char *s)
 {
     const char *sep=" \t\n";
     char *word = NULL;
-
+    char *h = strdup(s);
     // find out exactly how many tokens we have
     int words = 0;
-    for (word = strtok(s, sep);
-         word;
-         word = strtok(NULL, sep)) words++ ;
-
+    for (word = strtok(h, sep); word; word = strtok(NULL, sep)) 
+        words++;
+    free(h);
     printf("words: %d\n", words);
     printf("s: %s\n", s);
 
     // allocate the array of char *'s, with one additional
-    char **array = (char **)malloc(sizeof(char)*(words+1));
+    char **array = (char **)malloc(sizeof(char*)*(words+1));
     int i = 0;
-    for (word = strtok(s, sep);
-         word;
-         word = strtok(NULL, sep)) {
+    for (word = strtok(s, sep); word; word = strtok(NULL, sep)) 
+    {
         printf("adding word %s to array pos %d\n", word, i);
         array[i] = strdup(word);
+        printf("%s\n", array[0]);
         i++;
     }
+    array[i] = NULL;
     return array;
 }
 
-void
-printtokens(char **tokenlist) {
+void printtokens(char **tokenlist) 
+{
     char *tmp = tokenlist[0];
     int toknum = 0;
     printf("Printing tokens:\n");
-    while (tmp != NULL) {
+    while (tmp != NULL) 
+    {
         printf("\t%d: <%s>\n", toknum, tmp);
         toknum++;
+        tmp = tokenlist[toknum];
     }
 }
 
-int
-main(int argc, char **argv) {
+int main(int argc, char **argv) 
+{
     char s1[] = "  the \tinternet is a series of tubes  ";
     char s2[] = "   \t\n";
     char s3[] = "  the \tinternet is not a series of tubes  ";
@@ -77,8 +77,9 @@ main(int argc, char **argv) {
     removewhitespace(s2);
     printf("Remove whitespace - s1: %s\n", s1);
     printf("Remove whitespace - s2: %s\n", s2);
-
-    printtokens(tokenify(s3));
+    char **res = tokenify(s3);
+    printf("%s\n", res[0]);
+    printtokens(res);
     printtokens(tokenify(s4));
     printtokens(tokenify(s5));
 
