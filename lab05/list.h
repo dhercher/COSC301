@@ -4,14 +4,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <errno.h>
+#include <string.h>
 
-struct __list_node {
+struct __list_node 
+{
     int data;
     struct __list_node *next;
 };
 
-typedef struct {
+typedef struct 
+{
     struct __list_node *head;
+    pthread_mutex_t mutex;
 } list_t;
 
 void list_init(list_t *);

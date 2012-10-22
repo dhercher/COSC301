@@ -11,7 +11,8 @@ struct thread_args {
     int values_to_add;
 };
 
-void *worker_thread(void *v) {
+void *worker_thread(void *v) 
+{
     fprintf(stderr,"Thread 0x%0lx started.\n", (long)pthread_self());
     
     struct thread_args *targs = (struct thread_args*)v;
@@ -47,21 +48,24 @@ void usage(const char *progname) {
 }
 
 int main(int argc, char **argv) {
-    int num_threads = 1;
+    int num_threads = 5;
     int values_to_add = 10;
     
     int c;
     while ((c = getopt(argc, argv, "t:m:h")) != -1) {
-        switch(c) {
+        switch(c) 
+        {
             case 't':
                 num_threads = atoi(optarg);
-                if (num_threads < 1 || num_threads > 100) {
+                if (num_threads < 1 || num_threads > 100) 
+                {
                     usage(argv[0]);
                 }
                 break;
             case 'm':
                 values_to_add = atoi(optarg);
-                if (values_to_add < 1) {
+                if (values_to_add < 1) 
+                {
                     usage(argv[0]);
                 }
                 break;
