@@ -20,6 +20,16 @@
 int prepare_server_socket(unsigned short);
 int senddata(int, const char *, int);
 int getrequest(int, char *, int);
+void worker(void *varg);
+
+struct thread_d{
+	pthread_t *thread;
+	int sock;
+	char *buf;
+	int buf_size;
+	pthread_mutex_t *mutex;
+	struct sockaddr_in client;
+};
 
 #define HTTP_404 "HTTP/1.0 404 Not found\r\n\r\n"
 #define HTTP_200 "HTTP/1.0 200 OK\r\nContent-type: text/plain\r\nContent-length: %d\r\n\r\n"
