@@ -28,7 +28,8 @@ void list_print(list_t *list, FILE *f) {
 /* ************************************** 
  * add item "val" to the list, in order.
  * ************************************** */
-void list_add(list_t *list, int val) {
+void list_add(list_t *list, int val) 
+{
     pthread_mutex_lock(&list->mutex);
     struct __list_node *new_node = (struct __list_node *)malloc (sizeof(struct __list_node));
     if (!new_node) {
@@ -130,7 +131,8 @@ int list_remove(list_t *list, int target) {
  * clear out the entire list, freeing all
  * elements.
  * ************************************** */
-void list_clear(list_t *list) {
+void list_clear(list_t *list) 
+{
     pthread_mutex_lock(&list->mutex);
     struct __list_node *tmp = list->head;
     while (tmp) {

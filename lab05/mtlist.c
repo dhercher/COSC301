@@ -50,7 +50,6 @@ void usage(const char *progname) {
 int main(int argc, char **argv) {
     int num_threads = 5;
     int values_to_add = 10;
-    
     int c;
     while ((c = getopt(argc, argv, "t:m:h")) != -1) {
         switch(c) 
