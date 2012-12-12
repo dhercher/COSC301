@@ -79,7 +79,6 @@ int fs_mknod(const char *path, mode_t mode, dev_t dev) {
 int fs_mkdir(const char *path, mode_t mode) {
     fprintf(stderr, "fs_mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    mode |= S_IFDIR;
     char * dir_path = strdup(dirname(path));
     char * dir_name = strdup(basename(path));
     uint8_t * dir;
@@ -196,7 +195,95 @@ int fs_unlink(const char *path) {
 int fs_rmdir(const char *path) {
     fprintf(stderr, "fs_rmdir(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    char * dir_path = strdup(dirname(path));
+    char * dir_name = strdup(basename(path));
+    char * t_path = strdup(path);
+    strcat(t_path, "/.");
+    uint8_t * dir;
+    if(s3fs_get_object(ctx->s3bucket, t_path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Directory path was not valid.\n");
+      return -EIO;
+    }
+    s3dirent_t * obj = (s3dirent_t *) dir;
+    if(S_ISDIR(obj[0].data.st_mode) == 0)
+    {
+      fprintf(stderr, "Requested location is not a directory.\n");
+      return -EIO;
+    }
+    if(obj[0].data.next != NULL)
+    {
+      fprintf(stderr, "Directory is not empty.\n");
+      return -EIO;
+    }
+    free(dir);
+    free(obj);
+    if(s3fs_get_object(ctx->s3bucket, path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory path was not valid.\n");
+      return -EIO;
+    }
+    obj = (s3dirent_t *) dir;
+    free(dir);
+    char * back_path = strdup(dir_path);
+    strcat(back_path, "/.");
+    if(s3fs_get_object(ctx->s3bucket, back_path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory path was not valid.\n");
+      return -EIO;
+    }
+    s3dirent_t * old_obj = (s3dirent_t *) dir;
+    while(old_obj[0].next != NULL && old_obj[0].next < dir_name)
+    {
+      back_path = strdup(dir_path);
+      strcat(back_path, old_obj[0].next);
+      free(old_obj); 
+      free(dir);
+      if(s3fs_get_object(ctx->s3bucket, back_path, &dir, 0, 0) < 0)
+      {
+        fprintf(stderr, "Requested directory location has corrupted data.\n");
+        return -EIO;
+      }
+      old_obj = (s3dirent_t *) dir;
+      free(back_path);
+    }
+    if(old_obj[0].next != NULL)
+    {
+      fprintf(stderr, "Requested directory location has corrupted data.\n");
+      return -EIO;
+    }
+    back_path = strdup(dir_path);
+    strcat(back_path, old_obj[0].name);
+    old_obj[0].next = obj[0].next;
+    struct timeval curr;
+    t_time now;
+    gettimeofday(&curr, NULL);
+    now = curr.tv_sec;
+    old_obj[0].st_atime = now;
+    if(s3fs_put_object(ctx->s3bucket, back_path, (uint8_t *) &old_obj[0], sizeof(obj[0])) != sizeof(old_obj[0]))
+    {
+      fprintf(stderr, "Failed to remove directory.\n");
+      return -EIO;
+    }
+    if(s3fs_remove_object(ctx->s3bucket, path) == -1)
+    {
+      fprintf(stderr, "Directory removed from path: memory leak.\n");
+      return 0;
+    }
+    if(s3fs_remove_object(ctx->s3bucket, t_path) == -1)
+    {
+      fprintf(stderr, "Directory removed from path: memory leak.\n");
+      return 0;
+    }
+
+    free(dir);
+    free(obj);
+    free(old_obj);
+    free(dir_path);
+    free(dir_name);
+    free(t_path);
+    free(back_path);
+    return 0;
 }
 
 /*
@@ -383,6 +470,23 @@ int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
       return -EIO;
     }
     char * t_path;
+
+    t_path = strdup(path);
+    strcat(t_path, obj[0].first);
+    free(obj); 
+    free(dir);
+    if(s3fs_get_object(ctx->s3bucket, t_path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory has corrupted data.\n");
+      return -EIO;
+    }
+    obj = (s3dirent_t *) dir;
+    if(filler(buf, obj[0].name, NULL, 0) != 0)
+    {
+      return -ENOMEM;
+    }
+    free(t_path);
+
     while(obj[0].next != NULL)
     {
       t_path = strdup(path);
