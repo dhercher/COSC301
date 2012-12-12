@@ -41,8 +41,18 @@
 int fs_getattr(const char *path, struct stat *statbuf) {
     fprintf(stderr, "fs_getattr(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    uint8_t *buf;
+    if(s3fs_get_object(ctx->s3bucket, path, &buf, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested path was not valid.\n");
+      return -1;
+    }
+    s3dirent_t * dir = (s3dirent_t *) buf;
+    *statbuf = dir[0].data;
+    free(buf);
+    return 0;
 }
+
 
 
 /* 
@@ -70,8 +80,105 @@ int fs_mkdir(const char *path, mode_t mode) {
     fprintf(stderr, "fs_mkdir(path=\"%s\", mode=0%3o)\n", path, mode);
     s3context_t *ctx = GET_PRIVATE_DATA;
     mode |= S_IFDIR;
-
-    return -EIO;
+    char * dir_path = strdup(dirname(path));
+    char * dir_name = strdup(basename(path));
+    uint8_t * dir;
+    if(s3fs_get_object(ctx->s3bucket, dir_path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory path was not valid.\n");
+      return -EIO;
+    }
+    s3dirent_t * obj = (s3dirent_t *) dir;
+    if(S_ISDIR(obj[0].data.st_mode) == 0)
+    {
+      fprintf(stderr, "Requested location is not a directory.\n");
+      return -EIO;
+    }
+    char * t_path;
+    t_path = strdup(dir_path);
+    strcat(t_path, obj[0].first);
+    free(obj); 
+    free(dir);
+    if(s3fs_get_object(ctx->s3bucket, t_path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory location has corrupted data.\n");
+      return -EIO;
+    }
+    obj = (s3dirent_t *) dir;
+    free(t_path);
+    while(obj[0].next != NULL && obj[0].next < dir_name)
+    {
+      t_path = strdup(dir_path);
+      strcat(t_path, obj[0].next);
+      free(obj); 
+      free(dir);
+      if(s3fs_get_object(ctx->s3bucket, t_path, &dir, 0, 0) < 0)
+      {
+        fprintf(stderr, "Requested directory location has corrupted data.\n");
+        return -EIO;
+      }
+      obj = (s3dirent_t *) dir;
+      free(t_path);
+    }
+    if(obj[0].next == dir_name)
+    {
+      fprintf(stderr, "Requested path name already exists.\n");
+      return -EIO;
+    }
+    t_path = strdup(dir_path);
+    strcat(t_path, dir_name);
+    s3dirent_t new_dir;
+    struct stat dat;
+    struct timeval curr;
+    t_time now;
+    gettimeofday(&curr, NULL);
+    now = curr.tv_sec;
+    dat.st_mode = (S_IFDIR | S_IRWXU);
+    dat.st_nlink = 1;
+    dat.st_uid = getuid(); 
+    dat.st_gid = getgid();
+    dat.st_atime = now;
+    dat.st_mtime = now;
+    dat.st_ctime = now;
+    dat.st_size = sizeof(s3dirent_t);
+    strcpy(new_dir.name, dir_name);
+    new_dir.data = dat;
+    new_dir.first = ".";
+    new_dir.next = obj[0].next;
+    if(s3fs_put_object(ctx->s3bucket, t_path, (uint8_t *) &new_dir, sizeof(new_dir)) != sizeof(new_dir))
+    {
+      fprintf(stderr, "Failed to add new directory.\n");
+      return -EIO;
+    }
+    free(t_path);
+    free(new_dir.name);
+    strcpy(new_dir.name, ".");
+    t_path = strdup(dir_path);
+    strcat(t_path, dir_name);
+    strcat(t_path, "/.");
+    new_dir.first = NULL;
+    new_dir.next = NULL;
+    if(s3fs_put_object(ctx->s3bucket, t_path, (uint8_t *) &new_dir, sizeof(new_dir)) != sizeof(new_dir))
+    {
+      fprintf(stderr, "Failed to add new directory.\n");
+      return -EIO;
+    }
+    free(t_path);
+    obj[0].st_atime = now;
+    t_path = strdup(dir_path);
+    strcat(t_path, obj[0].name);
+    obj[0].next = dir_name;
+    if(s3fs_put_object(ctx->s3bucket, t_path, (uint8_t *) &obj[0], sizeof(obj[0])) != sizeof(obj[0]))
+    {
+      fprintf(stderr, "Failed to add new directory.\n");
+      return -EIO;
+    }
+    free(t_path);
+    free(obj);
+    free(dir);
+    free(dir_path);
+    free(dir_name);
+    return 0;
 }
 
 /*
@@ -237,7 +344,20 @@ int fs_fsync(const char *path, int datasync, struct fuse_file_info *fi) {
 int fs_opendir(const char *path, struct fuse_file_info *fi) {
     fprintf(stderr, "fs_opendir(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    uint8_t *buf;
+    if(s3fs_get_object(ctx->s3bucket, path, &buf, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory path was not valid.\n");
+      return -EIO;
+    }
+    s3dirent_t * dir = (s3dirent_t *) buf;
+    if(S_ISDIR(dir[0].data.st_mode) == 0)
+    {
+      fprintf(stderr, "Requested path is not a directory.\n");
+      return -EIO;
+    }
+    free(buf);
+    return 0;
 }
 
 /*
@@ -250,7 +370,40 @@ int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
     fprintf(stderr, "fs_readdir(path=\"%s\", buf=%p, offset=%d)\n",
 	        path, buf, (int)offset);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    uint8_t * dir;
+    if(s3fs_get_object(ctx->s3bucket, path, &dir, 0, 0) < 0)
+    {
+      fprintf(stderr, "Requested directory path was not valid.\n");
+      return -EIO;
+    }
+    s3dirent_t * obj = (s3dirent_t *) dir;
+    if(S_ISDIR(obj[0].data.st_mode) == 0)
+    {
+      fprintf(stderr, "Requested path is not a directory.\n");
+      return -EIO;
+    }
+    char * t_path;
+    while(obj[0].next != NULL)
+    {
+      t_path = strdup(path);
+      strcat(t_path, obj[0].next);
+      free(obj); 
+      free(dir);
+      if(s3fs_get_object(ctx->s3bucket, t_path, &dir, 0, 0) < 0)
+      {
+        fprintf(stderr, "Requested directory has corrupted data.\n");
+        return -EIO;
+      }
+      obj = (s3dirent_t *) dir;
+      if(filler(buf, obj[0].name, NULL, 0) != 0)
+      {
+        return -ENOMEM;
+      }
+      free(t_path);
+    }
+    free(obj);
+    free(dir);
+    return 0;
 }
 
 /*
@@ -259,7 +412,7 @@ int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
 int fs_releasedir(const char *path, struct fuse_file_info *fi) {
     fprintf(stderr, "fs_releasedir(path=\"%s\")\n", path);
     s3context_t *ctx = GET_PRIVATE_DATA;
-    return -EIO;
+    return 0;
 }
 
 /*
@@ -280,6 +433,32 @@ void *fs_init(struct fuse_conn_info *conn)
 {
     fprintf(stderr, "fs_init --- initializing file system.\n");
     s3context_t *ctx = GET_PRIVATE_DATA;
+    if(s3fs_clear_bucket(ctx->s3bucket) < 0)
+    {
+      fprintf(stderr, "Failed to Initialize: Bucket Failed to clear.\n");
+      return -EIO;
+    }
+    s3dirent_t dir;
+    struct stat dat;
+    struct timeval curr;
+    t_time now;
+    gettimeofday(&curr, NULL);
+    now = curr.tv_sec;
+    dat.st_mode = (S_IFDIR | S_IRWXU);
+    dat.st_nlink = 1;
+    dat.st_uid = getuid(); 
+    dat.st_gid = getgid();
+    dat.st_atime = now;
+    dat.st_mtime = now;
+    dat.st_ctime = now;
+    dat.st_size = sizeof(s3dirent_t);
+    strcpy(dir.name, ".");
+    dir.data = dat;
+    if(s3fs_put_object(ctx->s3bucket, "/", (uint8_t *) &dir, sizeof(dir)) != sizeof(dir))
+    {
+      fprintf(stderr, "Failed to Initialize: Object was not put in s3.\n");
+      return -EIO;
+    }
     return ctx;
 }
 

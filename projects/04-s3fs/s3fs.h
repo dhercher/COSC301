@@ -6,7 +6,7 @@
 #include <sys/time.h> // for struct timeval
 
 /* This code is based on the fine code written by Joseph Pfeiffer for his
-   fuse system tutorial. */
+   fuse system tutorial. */ 
 
 /* Declare to the FUSE API which version we're willing to speak */
 #define FUSE_USE_VERSION 26
@@ -17,16 +17,29 @@
 
 #define BUFFERSIZE 1024
 
+
 // store filesystem state information in this struct
 typedef struct {
     char s3bucket[BUFFERSIZE];
 } s3context_t;
+
 
 /*
  * Other data type definitions (e.g., a directory entry
  * type) should go here.
  */
 
+
+
+typedef struct s3dirent_t {
+        char name[256];     // reasonable upper-bound on a name        
+        // metadata items would go here, too
+        struct stat data;
+        char * next;
+        char * first;
+    } s3dirent_t;
+
+struct meta getattrrec(char * dir, char * base);
 
 
 
